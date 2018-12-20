@@ -2,24 +2,25 @@
 
 #include "serial_inputs.h"
 
-const byte buff_size = 64;
+const unsigned int buff_size = 64;
 char raw_input[buff_size];
 
 pregame_arm_data *read_arm_pregame(){
-  byte inc = 0;
-  
-  while (Serial.available() > 0 && inc < buff_size-1) { 
+  unsigned int inc = 0;
+
+  /* Blocks until recieves data from rpi */
+  while (Serial.available() > 0 && inc < buff_size-2) {
     raw_input[inc] = Serial.read();
     inc ++;
   }
-  raw_input[inc] = 0;  // end-of-string
+  raw_input[inc] = '\0';  // end-of-string
   pregame_arm_data *arm_data = malloc(sizeof(pregame_arm_data));
 
   char *partOfString;
 
   // parse first value: x position
   partOfString = strtok(raw_input, ",");
-  float arm0_x = atof(partOfString);     // convert this part to an integer
+  float arm0_x = atof(partOfString);     // convert this part to a float
   arm_data->arm0_x = arm0_x;
 
   // parse second value: y position
@@ -41,13 +42,14 @@ pregame_arm_data *read_arm_pregame(){
 }
 
 rec_arm_data *read_arm_goals(){
-  byte inc = 0;
-  while (!Serial.available());  // block until receiving data from rpi
-  while (Serial.available() > 0 && inc < buff_size-1) {
+  unsigned int inc = 0;
+
+  /* Blocks until recieves data from rpi */
+  while (Serial.available() > 0 && inc < buff_size-2) {
     raw_input[inc] = Serial.read();
     inc ++;
   }
-  raw_input[inc] = 0;  // end-of-string
+  raw_input[inc] = '/0';  // end-of-string
   rec_arm_data *rec_data = (rec_arm_data*)malloc(sizeof(rec_arm_data));
   char *partOfString;
 
