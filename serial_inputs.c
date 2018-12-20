@@ -7,8 +7,8 @@ char raw_input[buff_size];
 
 pregame_arm_data *read_arm_pregame(){
   byte inc = 0;
-  while (!Serial.available());  // block until receiving data from rpi
-  while (Serial.available() > 0 && inc < buff_size-1) {
+  
+  while (Serial.available() > 0 && inc < buff_size-1) { 
     raw_input[inc] = Serial.read();
     inc ++;
   }
