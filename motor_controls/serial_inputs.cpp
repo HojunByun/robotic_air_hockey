@@ -1,55 +1,60 @@
 #include <stdlib.h>
+#include <SoftwareSerial.h>
+#include <HardwareSerial.cpp>
 
 #include "serial_inputs.h"
 
-const unsigned int buff_size = 64;
-char raw_input[buff_size];
+extern HardwareSerial Serial;
+
+// functions/vars can only be defined once, but can be declared multiple times
+
+const int buff_size = 64;
 
 pregame_arm_data *read_arm_pregame(){
-  unsigned int inc = 0;
-
-  /* Blocks until recieves data from rpi */
-  while (Serial.available() > 0 && inc < buff_size-2) {
+  int inc = 0;
+  char raw_input[buff_size];
+  while (!Serial.available());  // block until receiving data from rpi
+  while (Serial.available() > 0 && inc < buff_size-1) {
     raw_input[inc] = Serial.read();
     inc ++;
   }
-  raw_input[inc] = '\0';  // end-of-string
+  raw_input[inc] = 0;  // end-of-string
   pregame_arm_data *arm_data = malloc(sizeof(pregame_arm_data));
 
   char *partOfString;
 
   // parse first value: x position
   partOfString = strtok(raw_input, ",");
-  float arm0_x = atof(partOfString);     // convert this part to a float
-  arm_data->arm0_x = arm0_x;
+  float arm0_theta0 = atof(partOfString);     // convert this part to an integer
+  arm_data->arm0_theta0 = arm0_theta0;
 
   // parse second value: y position
   partOfString = strtok(NULL, ",");
-  float arm0_y = atof(partOfString);     // convert this part to a float
-  arm_data->arm0_y = arm0_y;
+  float arm0_theta1 = atof(partOfString);     // convert this part to a float
+  arm_data->arm0_theta1 = arm0_theta1;
 
   // parse second value: y position
   partOfString = strtok(NULL, ",");
-  float arm1_x = atof(partOfString);     // convert this part to a float
-  arm_data->arm1_x = arm1_x;
+  float arm1_theta0 = atof(partOfString);     // convert this part to a float
+  arm_data->arm1_theta0 = arm1_theta0;
 
   // parse second value: y position
   partOfString = strtok(NULL, ",");
-  float arm1_y = atof(partOfString);     // convert this part to a float
-  arm_data->arm1_y = arm1_y;
+  float arm1_theta1 = atof(partOfString);     // convert this part to a float
+  arm_data->arm1_theta1 = arm1_theta1;
 
-  return rec_data;
+  return arm_data;
 }
 
 rec_arm_data *read_arm_goals(){
-  unsigned int inc = 0;
-
-  /* Blocks until recieves data from rpi */
-  while (Serial.available() > 0 && inc < buff_size-2) {
+  int inc = 0;
+  char raw_input[buff_size];
+  while (!Serial.available());  // block until receiving data from rpi
+  while (Serial.available() > 0 && inc < buff_size-1) {
     raw_input[inc] = Serial.read();
     inc ++;
   }
-  raw_input[inc] = '/0';  // end-of-string
+  raw_input[inc] = 0;  // end-of-string
   rec_arm_data *rec_data = (rec_arm_data*)malloc(sizeof(rec_arm_data));
   char *partOfString;
 

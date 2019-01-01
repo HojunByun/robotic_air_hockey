@@ -8,11 +8,12 @@
  *  end-effector goal velocity: (v_x, v_y)
  * overall parse a string of floats separated by commas: x, y, v_x, v_y
  */
+ 
 rec_arm_data *read_arm_goals();
 
 /* read initial arm pose for pre-game calibration
  * v_x and v_y are dummy values
  */
-regame_arm_data *read_arm_pregame();
+pregame_arm_data *read_arm_pregame();
 
 #endif
