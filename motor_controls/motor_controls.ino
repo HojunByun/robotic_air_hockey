@@ -2,108 +2,91 @@
 #include <math.h>
 #include <ros.h>
 #include <airhockey_main/ArmAngles.h>
+#include <AccelStepper.h>
+#include <MultiStepper.h>
 
 #include "serial_inputs.h"
-#include "arm_data_struct.h"
 
 #define LENGTH (double)5  // inches
 #define SQ(x) (double)(x*x)
-#define STEP_ROT DEG_TO_RAD*3  // 3 degrees
+#define STEPS_PER_ROT (float)3200
+#define RAD_TO_STEP(x) x*(STEPS_PER_ROT/(2*PI))
 
 // ros setup
 ros::NodeHandle nh;
 
-// arm0(left) and arm1(right) setup
-store_arm_data arm0;
-store_arm_data arm1;
+// arm1(left) and arm2(right) setup
+AccelStepper arm0_stepper0(AccelStepper::DRIVER, 2, 3);
+AccelStepper arm0_stepper1(AccelStepper::DRIVER, 4, 5);
+AccelStepper arm1_stepper0(AccelStepper::DRIVER, 6, 7);
+AccelStepper arm1_stepper1(AccelStepper::DRIVER, 8, 9);
+
+// globals
+bool calibrated = false;
 
 // callback that receives ground-truth arm angles from raspberry pi
 void recalib_cb(airhockey_main::ArmAngles& arm_data)
 {
   if (arm_data.success) {
-    arm0.arm_theta0 = arm_data.arm0_joint0;
-    arm0.arm_theta1 = arm_data.arm0_joint1;
-    arm1.arm_theta0 = arm_data.arm1_joint0;
-    arm1.arm_theta1 = arm_data.arm1_joint1;
+    arm0_stepper0.setCurrentPosition(RAD_TO_STEP(arm_data.arm0_joint0));
+    arm0_stepper1.setCurrentPosition(RAD_TO_STEP(arm_data.arm0_joint1));
+    arm1_stepper0.setCurrentPosition(RAD_TO_STEP(arm_data.arm1_joint0));
+    arm1_stepper1.setCurrentPosition(RAD_TO_STEP(arm_data.arm1_joint1));
+    calibrated = true;
   } else {
     // some warning LED or display that says calibration incomplete
     // maybe force user to recalibrate by pressing some button again
-    digitalWrite(LED_BUILTIN, 1 - digitalRead(LED_BUILTIN));
+    digitalWrite(LED_BUILTIN, HIGH);
   }
 }
 
-ros::Subscriber<airhockey_main::ArmAngles> recalib_sub("recalib_arm_angles", &recalib_cb);
-
-void init_pins()
+void receive_goal_cb(airhockey_main::ArmAngles& arm_data)
 {
-  arm0.motor0_step_pin = 2;
-  arm0.motor1_step_pin = 3;
-  arm0.motor0_dir_pin = 4;
-  arm0.motor1_dir_pin = 5;
-
-  arm1.motor0_step_pin = 6;
-  arm1.motor1_step_pin = 7;
-  arm1.motor0_dir_pin = 8;
-  arm1.motor1_dir_pin = 9;
+  arm0_stepper0.moveTo(RAD_TO_STEP(arm_data.arm0_joint0));
+  arm0_stepper1.moveTo(RAD_TO_STEP(arm_data.arm0_joint1));
+  arm1_stepper0.moveTo(RAD_TO_STEP(arm_data.arm1_joint0));
+  arm1_stepper1.moveTo(RAD_TO_STEP(arm_data.arm1_joint1));
 }
 
-void move_arm(store_arm_data arm, float goal_theta0, float goal_theta1)
+void wait_for_calib()
 {
-  float diff0 = goal_theta0 - arm.arm_theta0;
-  float diff1 = goal_theta1 - arm.arm_theta1;
-
-  // replace all of this with a ros trajectory
-  while(diff0 > 1 && diff1 > 1) {
-    // to make stepper motors move one step, generate square wave signal
-    digitalWrite(arm.motor0_step_pin, HIGH);
-    digitalWrite(arm.motor1_step_pin, HIGH);
-    digitalWrite(arm.motor0_step_pin, HIGH);
-    digitalWrite(arm.motor1_step_pin, HIGH);
-    delayMicroseconds(300);
-
-    digitalWrite(arm.motor0_step_pin, LOW);
-    digitalWrite(arm.motor1_step_pin, LOW);
-    digitalWrite(arm.motor0_step_pin, LOW);
-    digitalWrite(arm.motor1_step_pin, LOW);
-    delayMicroseconds(300);
-    arm.arm_theta0 += STEP_ROT;  // each step is a certain angle
-    arm.arm_theta1 += STEP_ROT;
-
-    // NOTE: need to convert normal stepper rotation to belt translation
-    // for second arm since motor drives a belt and armindirectly
-    diff0 = goal_theta0 - arm.arm_theta0;
-    diff1 = goal_theta1 - arm.arm_theta1;
-  }
+  // show some LED or text on an LCD screen notifying players
+  digitalWrite(LED_BUILTIN, HIGH);
+  while(!calibrated) ;  // check if this loop slows down Arduino
+  digitalWrite(LED_BUILTIN, LOW);
 }
 
+// set default max speed and acceleration for the four motors
+void config_motors()
+{
+  arm0_stepper0.setMaxSpeed(10000);  // max 10,000 steps/s
+  arm0_stepper0.setAcceleration(5000);
+  arm0_stepper1.setMaxSpeed(10000);
+  arm0_stepper1.setAcceleration(5000);
+  arm1_stepper0.setMaxSpeed(10000);
+  arm1_stepper0.setAcceleration(5000);
+  arm1_stepper1.setMaxSpeed(10000);
+  arm1_stepper1.setAcceleration(5000);
+}
+
+ros::Subscriber<airhockey_main::ArmAngles> \
+  recalib_sub("recalib_arm_angles", &recalib_cb);
 
 void setup() {
-  init_pins();
-  // set motor control pin modes
-  pinMode(arm0.motor0_step_pin, OUTPUT);
-  pinMode(arm0.motor1_step_pin, OUTPUT);
-  pinMode(arm0.motor0_dir_pin, OUTPUT);
-  pinMode(arm0.motor1_dir_pin, OUTPUT);
-
-  pinMode(arm1.motor0_step_pin, OUTPUT);
-  pinMode(arm1.motor1_step_pin, OUTPUT);
-  pinMode(arm1.motor0_dir_pin, OUTPUT);
-  pinMode(arm1.motor1_dir_pin, OUTPUT);
-  // digitalWrite(dirPin,HIGH); //Enables the motor to move in a particular direction
-
   pinMode(LED_BUILTIN, OUTPUT);
-  arm0.arm_theta0 = 0.0;
-  arm0.arm_theta1 = 0.0;
-  arm1.arm_theta0 = 0.0;
-  arm1.arm_theta1 = 0.0;
+  digitalWrite(LED_BUILTIN, LOW);
+
   nh.initNode();
   nh.subscribe(recalib_sub);
 
+  config_motors();
+  wait_for_calib();
 }
 
 
 void loop() {
   nh.spinOnce();
+
   delay(100);
 
 }
