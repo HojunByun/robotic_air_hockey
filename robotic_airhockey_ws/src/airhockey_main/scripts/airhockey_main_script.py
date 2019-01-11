@@ -1,19 +1,22 @@
 #!/usr/bin/env python
 
-import typing as t
-
 import rospy
-from airhockey_main.msgs import ArmAngles
+from airhockey_main.msg import ArmAngles
 
 import motion_planning as motion
 
 # import some opencv scripts
 
-def publish_arm_data(publisher: rospy.Publisher,
-                     arm_data: dict):
+def publish_arm_data(publisher, arm_data):
     """
     Takes in all necessary arm_data and publishes it to arduino. Serves as main
     communication node with arduino regardless of purpose.
+
+    :param publisher: ROS publisher to send arm data to arduino
+    :type: rospy.Publisher
+
+    :param arm_data: arm data
+    :type: dict
 
     """
     arm_data = ArmAngles()
@@ -25,9 +28,7 @@ def publish_arm_data(publisher: rospy.Publisher,
     arm_data.arm1_joint1 = arm_data['arm1_joint1']
     publisher.publish(arm_data)
 
-def defense_mode(publisher: rospy.Publisher,
-                 arm_data: dict,
-                 puck_pose: dict):
+def defense_mode(publisher, arm_data, puck_pose):
     """
     Defense mode picks the best arm to use for a given situation avoid a
     collision between both arms. Then simply commands that arm to move to the
@@ -36,10 +37,13 @@ def defense_mode(publisher: rospy.Publisher,
     against this.
 
     :param publisher: ROS publisher to send arm data to arduino
+    :type: rospy.Publisher
 
     :param arm_data: holds arm data, use of info, reliability bool
+    :type: dict
 
     :param puck_pose: holds current puck position and velocity x,y
+    :type: dict
 
     """
     arm_data['sucess'] = True
