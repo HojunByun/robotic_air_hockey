@@ -1,2 +1,0 @@
-airhockey_main
--DCATKIN_DEVEL_PREFIX=/home/alvin/robotic_airhockey_ws/devel -DCMAKE_INSTALL_PREFIX=/home/alvin/robotic_airhockey_ws/install -G Unix Makefiles
