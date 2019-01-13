@@ -43,7 +43,7 @@ def defense_mode(publisher, arm_data, puck_pose):
     :type: dict
 
     :param puck_pose: holds current puck position and velocity x,y
-    :type: dict
+    :type: Struct()
 
     """
     arm_data['sucess'] = True
