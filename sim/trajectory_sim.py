@@ -142,10 +142,20 @@ def draw_approx_bound(canvas, data):
 
 
 def draw_trajectory(canvas, data):
-    canvas.create_line(data.pred_x, data.pred_y,
-                        data.pred_x + data.pred_vx * data.reach_bound,
-                        data.pred_y + data.pred_vy * data.reach_bound,
-                        fill="red", width = 5)
+    collide_x, collide_y, success = find_orig_deflect_intersect(data)
+    # initial path of puck before deflection off wall
+    if success:
+        canvas.create_line(data.ball_x, data.ball_y, collide_x, collide_y,
+                            fill="red", width=5)
+
+        canvas.create_line(collide_x, collide_y,
+                            data.pred_x + data.pred_vx * data.reach_bound,
+                            data.pred_y + data.pred_vy * data.reach_bound,
+                            fill="red", width=5)
+    # canvas.create_line(data.pred_x, data.pred_y,
+    #                     data.pred_x + data.pred_vx * data.reach_bound,
+    #                     data.pred_y + data.pred_vy * data.reach_bound,
+    #                     fill="red", width = 3)
 
 
 def redrawAll(canvas, data):
@@ -262,6 +272,16 @@ def predict_puck_motion(data):
     data.goal0 = joint0 / DEG_TO_RAD
     data.goal1 = joint1 / DEG_TO_RAD
     data.reached_goal = False
+
+
+def find_orig_deflect_intersect(data):
+    try:
+        time_collide = (data.pred_x - data.ball_x) / (data.ball_vx - data.pred_vx)
+    except ZeroDivisionError:
+        return 0, 0, False
+    collide_x = data.ball_x + data.ball_vx * time_collide
+    collide_y = data.ball_y + data.ball_vy * time_collide
+    return collide_x, collide_y, True
 
 
 def check_reached_goal(cur, goal):

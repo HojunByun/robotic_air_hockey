@@ -33,8 +33,9 @@ def defense_mode(publisher, arm_data, puck_pose):
     Defense mode picks the best arm to use for a given situation avoid a
     collision between both arms. Then simply commands that arm to move to the
     anticipated puck location without any regard for puck's recoil velocity.
-    Mainly serves for testing inverse kinematics since it's no fun to play
-    against this.
+
+    This mode is triggered if the velocity of incoming puck is very high and
+    would be too fast for any special path.
 
     :param publisher: ROS publisher to send arm data to arduino
     :type: rospy.Publisher
@@ -61,6 +62,10 @@ def defense_mode(publisher, arm_data, puck_pose):
     publish_arm_data(publisher, arm_data)
 
 def attack_mode():
+    """
+    Use attack_mode if puck is moving towards robot at slow speed, allowing
+    robot to get time to set up a path.
+    """
     return
 
 def hybrid_mode():
@@ -94,6 +99,7 @@ def run_main():
     while not rospy.is_shutdown():
         # try to implement some distribution with random chance of selecting a
         # mode
+        # change to if velocity > FAST_THRESHOLD
         if (score['human'] < 3):
             defense_mode()
         elif (3 <= score['human'] > 6):

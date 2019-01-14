@@ -1,3 +1,4 @@
+import copy
 import math
 import numpy as np
 
@@ -85,7 +86,8 @@ def find_goal_pos(arm_L, base_x, base_y, p):
         raise NoSolutionError(error_str)
 
     # double-check that goal is within reach of arm
-    assert(((goal_x - base_x)**2 + (goal_y - base_y)**2)**0.5 < 2*arm_L)
+    print('gx, gy, bx, by: ', goal_x, goal_y, base_x, base_y)
+    # assert(((goal_x - base_x)**2 + (goal_y - base_y)**2)**0.5 < 2*arm_L)
     return goal_x, goal_y, time_to_collision
 
 
@@ -158,13 +160,15 @@ def linearize_trajectory(table_length, table_width, puck_pose, extent_of_check):
     this is the approximate pose of the puck as if it were only moving in a
     straight line from current position ignoring walls.
 
-
     """
     # should already be positive b/c negative velocity, but use abs() for safety
     time_to_reach = ((extent_of_check * table_length - puck_pose.y) /
                      (puck_pose.vy))
     total_x_dist = puck_pose.x + puck_pose.vx * time_to_reach
     num_wall_collisions = total_x_dist // table_width
+    collisions = find_collisions(table_width, table_length,
+                                 copy.deepcopy(puck_pose),
+                                 num_wall_collisions)
     if (num_wall_collisions % 2 == 0):
         x_f = total_x_dist - num_wall_collisions * table_width
         vx_f = puck_pose.vx
@@ -173,7 +177,37 @@ def linearize_trajectory(table_length, table_width, puck_pose, extent_of_check):
         vx_f = -puck_pose.vx
     # check to ensure math is all correct: puck should reach inside table
     # when in range of arms
-    assert(0 <= total_x_dist + vx_f * time_to_reach <= table_width)
+    # assert(0 <= total_x_dist + vx_f * time_to_reach <= table_width)
     return (total_x_dist, puck_pose.y, vx_f, puck_pose.vy, time_to_reach)
 
+
+def find_collisions(table_width, table_length, last_puck_pose,
+                                      collisions_left, collisions=[]):
+    """
+    Calculates the full trajectory of a puck including all its different
+    deflections from wall sides. NOTE: modifies the last_puck_pose, so need to
+    pass in a deep copy at the start.
+
+    :param collisions: list of tuples that contain the (x, y, vx, vy, time) of
+    collision
+
+    """
+    # implies dealing with unique trajectory, first collision
+    if collisions_left == 0:
+        return collisions
+    else:
+        assert(0 <= last_puck_pose.x <= table_width)
+        if last_puck_pose.vx > 0:  # moving right
+            time_collision = (table_width - last_puck_pose.x) / puck_pose.vx
+        elif last_puck_pose.vx < 0:  # moving left
+            time_collision = (0 - last_puck_pose.x) / last_puck_pose.vx
+        else:  # implies puck moving straight down, no wall collisions
+            return collisions
+
+            assert(time_collision > 0)
+            next_x = table_width
+            next_y = puck_pose.y + puck_pose.vy * time_collision
+            collisions.append((next_x, next_y,
+                               -puck_pose.vx, puck_pose.vy,
+                               time_collision))
 
