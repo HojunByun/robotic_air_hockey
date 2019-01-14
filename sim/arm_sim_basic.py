@@ -1,5 +1,6 @@
 from tkinter import *
 import math
+import sys
 
 # Credit to the 15-112 Course at Carnegie Mellon University for providing
 # example graphics functions with tkinter
@@ -8,6 +9,7 @@ import math
 DEG_TO_RAD = math.pi/180
 SC_WIDTH = 200
 SC_HEIGHT = 400
+root = Tk()
 
 ## Drawing ##
 def init(data):
@@ -38,6 +40,12 @@ def timerFired(data):
     # else, keep moving arm until reach goal
     else:
         move_arm(data)
+
+def keyPressed(event, data):
+    # press Q or q to quit
+    if (event.char == 'q') or (event.char == 'Q'):
+        root.destroy()
+        sys.exit()
 
 
 def move_arm(data):
@@ -111,22 +119,35 @@ def run(width=300, height=300):
         redrawAllWrapper(canvas, data)
         # pause, then call timerFired again
         canvas.after(data.timerDelay, timerFiredWrapper, canvas, data)
+    def keyPressedWrapper(event, canvas, data):
+        keyPressed(event, data)
+        redrawAllWrapper(canvas, data)
     # Set up data and call init
     class Struct(object): pass
     data = Struct()
     data.width = width
     data.height = height
-    root = Tk()
     root.resizable(width=False, height=False) # prevents resizing window
     init(data)
     # create the root and the canvas
     canvas = Canvas(root, width=data.width, height=data.height)
     canvas.configure(bd=0, highlightthickness=0)
     canvas.pack()
+    root.bind("<Key>", lambda event:
+        keyPressedWrapper(event, canvas, data))
     timerFiredWrapper(canvas, data)
     # and launch the app
     root.mainloop()  # blocks until window is closed
     print("bye!")
+
+
+def get_float_input():
+    try:
+        val = float(input())
+        return val
+    except:
+        root.destroy()
+        sys.exit()
 
 
 ## Logic and Calculations ##
@@ -136,22 +157,23 @@ def calc_joints_from_pos(arm_length, goal_x, goal_y):
     while (goal_x**2 + goal_y**2)**0.5 > (2*arm_length):
         print("Out of Range, Try Again:")
         print("Goal X:")
-        goal_x = float(input())
+        goal_x = get_float_input()
         print("Goal Y:")
-        goal_y = float(input())
+        goal_y = get_float_input()
     theta1 = math.acos((goal_x**2 + goal_y**2 - 2*arm_length**2) /
                        (2*arm_length**2))
-    theta0 = math.atan2(goal_y, goal_x) - (math.atan2(arm_length*math.sin(theta1),
-                                                 arm_length + arm_length*math.cos(theta1)))
+    theta0 = math.atan2(goal_y, goal_x) - (
+            math.atan2(arm_length*math.sin(theta1),
+                       arm_length + arm_length*math.cos(theta1)))
     # simply invert conversion to get radians to degree
     return (theta0 / DEG_TO_RAD, theta1 / DEG_TO_RAD)
 
 
 def take_input(data):
     print("Goal X:")
-    goal_x = float(input())
+    goal_x =  get_float_input()
     print("Goal Y:")
-    goal_y = float(input())
+    goal_y = get_float_input()
     (data.goal0, data.goal1) = calc_joints_from_pos(data.length, goal_x, goal_y)
     data.reached_goal = False  # not necessarily False, but allows for reset
 
