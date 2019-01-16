@@ -1,7 +1,10 @@
 from tkinter import *
+import copy
 import math
+import time
 import sys
 
+import utilities as util
 import motion_planning as motion  # actual functions driving robot movement
 
 # Credit to the 15-112 Course at Carnegie Mellon University for providing
@@ -10,13 +13,13 @@ import motion_planning as motion  # actual functions driving robot movement
 # this script demonstrates the correct determination of puck velocity vector
 # intersection with bounds of robot arm
 
+NUM_LINKS = 2
 SEC_TO_MILLIS = float(1)/1000
 DEG_TO_RAD = math.pi/180
 SC_WIDTH = 200
 SC_HEIGHT = 400
 EXTENT_CHECK = float(3)/4  # note: reversed for graphics, -> 1 means closer to arms
 root = Tk()
-class Struct(object): pass
 
 
 ## Drawing ##
@@ -32,13 +35,14 @@ def init(data):
     data.ball_orig_y = data.ball_r
     data.ball_vel = 5
     data.arm_length = 50
-    data.arm_width = 5
+    data.line_width = 5
     data.timerDelay = 25  # 25ms delay between each updated frame
     data.arm_color = "red"
     data.ball_color = "yellow"
-    data.dot_color = "purple"
+    data.dot_color = "green"
     data.real_arm_bounds_color = "orange"
-    data.appr_arm_bounds_color = "green"
+    data.deflect_traj_color = "purple"
+    data.bound_color = "black"
 
     # VARIABLES
     # so all angles in degrees so can increment/decrement easily
@@ -58,13 +62,7 @@ def init(data):
     data.time_to_collision = 0
     data.reached_goal = False
     data.move_ball = False
-
-
-def mousePressed(event, data):
-    data.ball_goal_x = event.x
-    data.ball_goal_y = event.y
-    approx_vel(data)
-    predict_puck_motion(data)
+    data.deflections = []
 
 
 def timerFired(data):
@@ -92,6 +90,49 @@ def keyPressed(event, data):
         data.move_ball = not data.move_ball
 
 
+def mousePressed(event, data):
+    data.ball_goal_x = event.x
+    data.ball_goal_y = event.y
+    approx_vel(data)
+
+    # un-transformed data
+    puck_pose = util.Struct()
+    puck_pose.x = data.ball_x
+    puck_pose.y = data.ball_y
+    puck_pose.vx = data.ball_vx
+    puck_pose.vy = data.ball_vy
+
+    # store table info
+    table = util.Struct()
+    table.width = SC_WIDTH
+    table.length = SC_HEIGHT
+
+    # store arm info
+    arm = util.Struct()
+    arm.x = data.arm0_x
+    arm.y = util.transform(data.arm0_y, True, SC_HEIGHT)
+    arm.num_links = NUM_LINKS
+    arm.link_length = data.arm_length
+
+    # Note: to show linearized trajectory, modify the below function to also
+    # return lin_trajectory
+    collision_info, deflections, joint_info = (
+            motion.predict_puck_motion(table, arm, puck_pose))
+
+    data.deflections = transform_deflections(deflections)
+    data.collision_x = collision_info.x
+    data.collision_y = util.transform(collision_info.y, True, SC_HEIGHT)
+    data.time_to_collision = collision_info.time_to_collision
+
+    data.goal0 = joint_info.joint0 / DEG_TO_RAD
+    data.goal1 = joint_info.joint1 / DEG_TO_RAD
+    data.reached_goal = False
+
+def draw_bounds(canvas, data):
+    canvas.create_line(SC_WIDTH, 0, SC_WIDTH, SC_HEIGHT,
+                       fill=data.bound_color, width=data.line_width)
+
+
 def draw_arm(canvas, data):
     end_x0 = data.arm0_x + data.arm_length * math.cos(data.arm0_theta0 * DEG_TO_RAD)
     end_y0 = data.arm0_y - data.arm_length * math.sin(data.arm0_theta0 * DEG_TO_RAD)
@@ -108,12 +149,12 @@ def draw_arm(canvas, data):
     canvas.create_line(data.arm0_x, data.arm0_y,  # starting x, y
                        end_x0, end_y0,            # ending x, y
                        fill=data.arm_color,           # color
-                       width=data.arm_width)      # width of line
+                       width=data.line_width)      # width of line
 
     # draw second link
     canvas.create_line(end_x0, end_y0,
                        end_x1, end_y1,
-                       fill=data.arm_color, width=data.arm_width)
+                       fill=data.arm_color, width=data.line_width)
 
 
 def draw_ball_and_collision(canvas, data):
@@ -135,33 +176,44 @@ def draw_perimeter(canvas, data):
                        outline=data.real_arm_bounds_color)
 
 
-def draw_approx_bound(canvas, data):
-    canvas.create_line(0, EXTENT_CHECK * SC_HEIGHT,
-                       SC_WIDTH, EXTENT_CHECK * SC_HEIGHT,
-                       fill=data.appr_arm_bounds_color, width=5)
-
-
 def draw_trajectory(canvas, data):
-    collide_x, collide_y, success = find_orig_deflect_intersect(data)
-    # initial path of puck before deflection off wall
-    if success:
-        canvas.create_line(data.ball_x, data.ball_y, collide_x, collide_y,
-                            fill="red", width=5)
+    # Draw simplified trajectory of puck without bounces
+    # Vector determined in motion.linearize_trajectory()
+    # canvas.create_line(data.pred_x, SC_HEIGHT - data.pred_y,
+    #                    data.collision_x, data.collision_y,
+    #                    fill=data.pred_traj_color, width=data.line_width)
 
-        canvas.create_line(collide_x, collide_y,
-                            data.pred_x + data.pred_vx * data.reach_bound,
-                            data.pred_y + data.pred_vy * data.reach_bound,
-                            fill="red", width=5)
-    # canvas.create_line(data.pred_x, data.pred_y,
-    #                     data.pred_x + data.pred_vx * data.reach_bound,
-    #                     data.pred_y + data.pred_vy * data.reach_bound,
-    #                     fill="red", width = 3)
+    # If no collisions, draw from puck to collision directly
+    if len(data.deflections) == 0:
+        canvas.create_line(data.ball_x, data.ball_y,
+                           data.collision_x, data.collision_y,
+                           fill=data.deflect_traj_color, width=data.line_width)
+    else:
+        # Draw first deflection trajectory from puck position to collision
+        first_collision = data.deflections[0]
+        canvas.create_line(data.ball_x, data.ball_y,
+                           first_collision[0], first_collision[1],
+                           fill=data.deflect_traj_color, width=data.line_width)
+
+        # Draw last deflection trajectory from last
+        last_deflection = data.deflections[-1]
+        canvas.create_line(last_deflection[0], last_deflection[1],
+                           data.collision_x, data.collision_y,
+                           fill=data.deflect_traj_color, width=data.line_width)
+
+        # Draw all other collision trajectories between two collision points
+        for inc in range(len(data.deflections) - 1):
+            prev_collision = data.deflections[inc]
+            next_collision = data.deflections[inc+1]
+            canvas.create_line(prev_collision[0], prev_collision[1],
+                               next_collision[0], next_collision[1],
+                               fill=data.deflect_traj_color, width=data.line_width)
 
 
 def redrawAll(canvas, data):
     draw_arm(canvas, data)
+    draw_bounds(canvas, data)
     draw_perimeter(canvas, data)
-    draw_approx_bound(canvas, data)
     draw_trajectory(canvas, data)
     draw_ball_and_collision(canvas, data)
     canvas.create_text(data.width/2, 50,
@@ -195,7 +247,7 @@ def run(width=300, height=300):
         redrawAllWrapper(canvas, data)
 
     # Set up data and call init
-    data = Struct()
+    data = util.Struct()
     data.width = width
     data.height = height
     root.resizable(width=False, height=False) # prevents resizing window
@@ -223,55 +275,15 @@ def approx_vel(data):
     ang = math.atan2((data.ball_goal_y - data.ball_orig_y),
                      data.ball_goal_x - data.ball_orig_x)
 
-    print('x', 'orig x')
-    print(data.ball_goal_x, data.ball_orig_x)
-    print('y', 'orig y')
-    print(data.ball_goal_y, data.ball_orig_y)
-    print('Approx angle: ', ang / DEG_TO_RAD)
-    print('dist: ', dist)
-    print('vx: ', dist * math.cos(ang))
-    print('vy: ', dist * math.sin(ang))
-
     data.ball_vx = data.ball_vel * math.cos(ang) * SEC_TO_MILLIS / data.timerDelay
     # -1 to account for graphics inversion of coordinate frame
     data.ball_vy = data.ball_vel * math.sin(ang) * SEC_TO_MILLIS / data.timerDelay
 
 
-def predict_puck_motion(data):
-    puck_pose = Struct()
-    # note: graphics frame v.s real-world frame flipped on y-axis
-    puck_pose.y = data.ball_y
-    puck_pose.x = data.ball_x
-    puck_pose.vx = data.ball_vx
-    puck_pose.vy = data.ball_vy
-
-    print("Orig(cartesian): puck_pose.x, puck_pose.y, puck_pose.vx, puck_pose.vy")
-    print(puck_pose.x, puck_pose.y, puck_pose.vx, puck_pose.vy)
-
-    puck_pose.x, puck_pose.y, puck_pose.vx, puck_pose.vy, data.reach_bound = (
-            motion.linearize_trajectory(SC_HEIGHT, SC_WIDTH, puck_pose, EXTENT_CHECK))
-
-    print("New: puck_pose.x, puck_pose.y, puck_pose.vx, puck_pose.vy")
-    print(puck_pose.x, puck_pose.y, puck_pose.vx, puck_pose.vy)
-
-    data.pred_x = puck_pose.x
-    data.pred_y = puck_pose.y
-    data.pred_vx = puck_pose.vx
-    data.pred_vy = puck_pose.vy
-
-    data.collision_x, collision_y, data.time_to_collision = (
-            motion.find_goal_pos(data.arm_length,
-                                 data.arm0_x, data.arm0_y,
-                                 puck_pose))
-    data.collision_y = collision_y
-
-    print("collision_x, collision_y", data.collision_x, data.collision_y)
-    joint0, joint1 = motion.calc_joints_from_pos(data.arm_length,
-                        data.collision_x - data.arm0_x,
-                        -1 * (data.collision_y - data.arm0_y))
-    data.goal0 = joint0 / DEG_TO_RAD
-    data.goal1 = joint1 / DEG_TO_RAD
-    data.reached_goal = False
+def transform_deflections(deflections):
+    for deflect in deflections:
+        deflect[1] = util.transform(deflect[1], True, SC_HEIGHT)
+    return deflections
 
 
 def find_orig_deflect_intersect(data):

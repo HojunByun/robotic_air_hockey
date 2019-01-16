@@ -28,6 +28,15 @@ def publish_arm_data(publisher, arm_data):
     arm_data.arm1_joint1 = arm_data['arm1_joint1']
     publisher.publish(arm_data)
 
+
+def extreme_defense_mode():
+    """
+    Don't even move in the y-direction, only have arms move horizontally to
+    block puck
+    """
+    return
+
+
 def defense_mode(publisher, arm_data, puck_pose):
     """
     Defense mode picks the best arm to use for a given situation avoid a
@@ -78,6 +87,17 @@ def hybrid_mode():
 
 def collab_mode():
     """
+    """
+    return
+
+
+def troll_mode():
+    """
+    Using the predictive puck trajectory calculations, determine very early on
+    whether the incoming puck will even enter the goal. If puck won't even enter
+    the goal, then just have arms do nothing or position so that they don't
+    touch the puck.
+
     """
     return
 

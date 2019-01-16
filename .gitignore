@@ -2,3 +2,4 @@
 .DS_Store?
 robotic_airhockey_ws/devel/
 robotic_airhockey_ws/build/
+sim/__pycache__/
