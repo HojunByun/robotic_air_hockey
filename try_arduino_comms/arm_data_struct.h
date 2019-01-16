@@ -42,15 +42,4 @@ struct store_arm_data_struct {
   float motor1_speed;
 };
 
-// hacky way to prevent accelStepper library from deccelerating arms as they
-// approach goal. Purpose is for arm to reach goal with a target velocity and
-// to have arm maintain this speed as it nears its target, need to provide
-// accelStepper classes wtih a somewhat unreachable goal.
-struct joint_goals_struct {
-  float arm0_theta0;
-  float arm0_theta1;
-  float arm1_theta0;
-  float arm1_theta1;
-}
-
 #endif

@@ -19,7 +19,8 @@ pregame_arm_data *read_arm_pregame(){
     inc ++;
   }
   raw_input[inc] = 0;  // end-of-string
-  pregame_arm_data *arm_data = malloc(sizeof(pregame_arm_data));
+  pregame_arm_data *arm_data = (
+      (pregame_arm_data*)malloc(sizeof(pregame_arm_data)));
 
   char *partOfString;
 
