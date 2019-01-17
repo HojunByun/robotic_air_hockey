@@ -13,6 +13,21 @@
 #define MAX_ERROR 2
 #define ROS_UPDATE_INTERVAL 300
 
+// Pin Connections for the Easy Drivers
+// Odd One:
+// Step - 1
+// Dir - 0
+// Top Left: 
+// Step - 10 
+// Dir - 9
+// Bottom Left:
+// Step - 13
+// Dir - 12
+// Bottom Right:
+// Step - 4
+// Dir - 3
+
+
 // ros setup
 ros::NodeHandle nh;
 
