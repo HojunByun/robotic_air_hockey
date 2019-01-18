@@ -158,7 +158,7 @@ def calc_goal_joint_pose(arm_L, arm_speed, table_L,
     :param goal_x, goal_y: goal x, y position of end effector
     :type: float
     """
-    theta_g = math.atan2(L - goal_y, goal_x)
+    theta_g = math.atan2(arm_L - goal_y, goal_x)
     arm_vel_g = np.array([
         [arm_speed * math.cos(theta_g)],
         [arm_speed * math.sin(theta_g)]
@@ -166,13 +166,27 @@ def calc_goal_joint_pose(arm_L, arm_speed, table_L,
     theta0_g, theta1_g = calc_joints_from_pos(arm_L, goal_x, goal_y)
 
     # determine angular velocity of joints
+     # determine angular velocity of joints
     jacobian = np.array([
-        [-arm_L * math.sin(theta1) - arm_L * math.sin(theta0 + theta1),
-         -arm_L * math.sin(theta0 + theta1)],
-        [arm_L * math.cos(theta1) + arm_L * math.cos(theta0 + theta1),
-         arm_L * math.cos(theta0 + theta1)]
+        [-arm_L * math.sin(theta1) - arm_L * math.sin(theta0 + theta1),     -arm_L * math.sin(theta0 + theta1)],
+        [arm_L * math.cos(theta1) + arm_L * math.cos(theta0 + theta1),      arm_L * math.cos(theta0 + theta1)]
     ])
-    inv_jacobian = np.linalg.inv(jacobian)
+
+    jacobian1 = np.array([
+        [arm_L * math.cos(theta0) * math.cos(theta1) - arm_L * math.sin(theta0) * math.sin(theta1), -arm_L * math.cos(theta0) * math.sin(theta1) - arm_L * math.sin(theta0) * math.cos(theta1)],
+        [arm_L * math.sin(theta0) * math.cos(theta1) + arm_L * math.cos(theta0) * math.sin(theta1), -arm_L * math.sin(theta0) * math.sin(theta1) + arm_L * math.cos(theta0) * math.cos(theta1)]
+    ])
+
+    jacobian2 = np.array([
+        [(-arm_L * math.sin(theta0) - arm_L *(math.sin(theta0) * math.cos(theta1) + math.cos(theta0) * math.sin(theta1))), 
+        (-arm_L * math.cos(theta0) * math.sin(theta1) - arm_L * math.sin(theta0) * math.cos(theta1))],
+        [( arm_L * math.cos(theta0) + arm_L *(math.cos(theta0) * math.cos(theta1) - math.sin(theta0) * math.sin(theta1))),
+        (-arm_L * math.sin(theta0) * math.sin(theta1) + arm_L * math.cos(theta0) * math.cos(theta1))]
+    ])
+
+
+
+    inv_jacobian = np.linalg.inv(jacobian2)
     omega = np.matmul(inv_jacobian, arm_vel_g)
     del_theta0 = theta0_g - theta0
     del_theta1 = theta1_g - theta1
